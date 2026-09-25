@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABULLAHI ABDI</title>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: #111;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+#game {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    height: 100vh;
+    max-height: 750px;
+    overflow: hidden;
+    background: #333;
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#score {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    color: white;
+    font-size: 22px;
+    font-weight: bold;
+    z-index: 5;
+}
+
+#gameOver {
+    position: absolute;
+    inset: 0;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    background: rgba(0,0,0,0.65);
+    color: white;
+    z-index: 10;
+}
+
+#gameOver h1 {
+    font-size: 42px;
+    margin-bottom: 15px;
+}
+
+#restart {
+    border: none;
+    padding: 14px 30px;
+    border-radius: 10px;
+    background: #00c853;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.controls {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 25px;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.control {
+    width: 75px;
+    height: 75px;
+    border-radius: 50%;
+    border: 2px solid white;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    font-size: 35px;
+    pointer-events: auto;
+    user-select: none;
+    touch-action: manipulation;
+}
+</style>
+</head>
+
+<body>
+
+<div id="game">
+
+    <canvas id="canvas"></canvas>
+
+    <
+    <div class="controls">
+        <button class="control" id="left">◀</button>
+        <button class="control" id="right">▶</button>
+    </div>
+
+    <div id="gameOver">
+        <h1>GAME OVER</h1>
+        <p id="finalScore">Score: 0</p>
+        <br>
+        <button id="restart">RESTART</button>
+    </div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const scoreText = document.getElementById("score");
+const gameOverScreen = document.getElementById("gameOver");
+const finalScore = document.getElementById("finalScore");
+const restartButton = document.getElementById("restart");
+
+let roadWidth;
+let roadX;
+
+let player;
+let obstacles;
+
+let score;
+let speed;
+let gameRunning;
+
+let leftPressed = false;
+let rightPressed = false;
+
+function resizeCanvas() {
+
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+
+    roadWidth = canvas.width * 0.72;
+    roadX = (canvas.width - roadWidth) / 2;
+}
+
+function startGame() {
+
+    resizeCanvas();
+
+    player = {
+        x: canvas.width / 2 - 22,
+        y: canvas.height - 150,
+        width: 44,
+        height: 75,
+        speed: 6
+    };
+
+    obstacles = [];
+
+    score = 0;
+    speed = 4;
+    gameRunning = true;
+
+    gameOverScreen.style.display = "none";
+
+    requestAnimationFrame(gameLoop);
+}
+
+function drawRoad() {
+
+    // Background
+    ctx.fillStyle = "#168a35";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Road
+    ctx.fillStyle = "#333";
+    ctx.fillRect(roadX, 0, roadWidth, canvas.height);
+
+    // Road edges
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(roadX, 0, 5, canvas.height);
+    ctx.fillRect(roadX + roadWidth - 5, 0, 5, canvas.height);
+
+    // Center road lines
+    ctx.fillStyle = "#fff";
+
+    const lineWidth = 8;
+    const lineHeight = 55;
+
+    for (let y = -100; y < canvas.height; y += 100) {
+
+        let movingY = (y + score * 4) % (canvas.height + 100);
+
+        ctx.fillRect(
+            canvas.width / 2 - lineWidth / 2,
+            movingY,
+            lineWidth,
+            lineHeight
+        );
+    }
+}
+
+function drawCar(car, color) {
+
+    // Body
+    ctx.fillStyle = color;
+
+    ctx.beginPath();
+    ctx.roundRect(
+        car.x,
+        car.y,
+        car.width,
+        car.height,
+        10
+    );
+
+    ctx.fill();
+
+    // Windows
+    ctx.fillStyle = "#9ee7ff";
+
+    ctx.fillRect(
+        car.x + 8,
+        car.y + 10,
+        car.width - 16,
+        20
+    );
+
+    ctx.fillRect(
+        car.x + 8,
+        car.y + 43,
+        car.width - 16,
+        18
+    );
+
+    // Wheels
+    ctx.fillStyle = "#111";
+
+    ctx.fillRect(
+        car.x - 5,
+        car.y + 12,
+        6,
+        20
+    );
+
+    ctx.fillRect(
+        car.x + car.width - 1,
+        car.y + 12,
+        6,
+        20
+    );
+
+    ctx.fillRect(
+        car.x - 5,
+        car.y + 45,
+        6,
+        20
+    );
+
+    ctx.fillRect(
+        car.x + car.width - 1,
+        car.y + 45,
+        6,
+        20
+    );
+}
+
+function createObstacle() {
+
+    const width = 44;
+    const height = 75;
+
+    const lanes = 3;
+
+    const laneWidth = roadWidth / lanes;
+
+    const lane = Math.floor(Math.random() * lanes);
+
+    const x =
+        roadX +
+        lane * laneWidth +
+        laneWidth / 2 -
+        width / 2;
+
+    obstacles.push({
+        x: x,
+        y: -height,
+        width: width,
+        height: height
+    });
+}
+
+function updatePlayer() {
+
+    if (leftPressed) {
+        player.x -= player.speed;
+    }
+
+    if (rightPressed) {
+        player.x += player.speed;
+    }
+
+    const minX = roadX + 8;
+    const maxX = roadX + roadWidth - player.width - 8;
+
+    if (player.x < minX) {
+        player.x = minX;
+    }
+
+    if (player.x > maxX) {
+        player.x = maxX;
+    }
+}
+
+function updateObstacles() {
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+
+        obstacles[i].y += speed;
+
+        if (obstacles[i].y > canvas.height + 100) {
+
+            obstacles.splice(i, 1);
+
+            score++;
+
+            scoreText.textContent = "Score: " + score;
+
+            if (score % 5 === 0) {
+                speed += 0.5;
+            }
+        }
+    }
+
+    if (
+        obstacles.length === 0 ||
+        obstacles[obstacles.length - 1].y > 180
+    ) {
+        createObstacle();
+    }
+}
+
+function collision(a, b) {
+
+    return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+    );
+}
+
+function checkCollision() {
+
+    for (const obstacle of obstacles) {
+
+        if (collision(player, obstacle)) {
+
+            endGame();
+
+            return;
+        }
+    }
+}
+
+function endGame() {
+
+    gameRunning = false;
+
+    finalScore.textContent = "Score: " + score;
+
+    gameOverScreen.style.display = "flex";
+}
+
+function gameLoop() {
+
+    if (!gameRunning) return;
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+    drawRoad();
+
+    updatePlayer();
+    updateObstacles();
+
+    for (const obstacle of obstacles) {
+        drawCar(obstacle, "#e53935");
+    }
+
+    drawCar(player, "#2196f3");
+ctx.fillStyle = "white";
+ctx.font = "bold 22px Arial";
+ctx.fillText("Score: " + score, 15, 35);
+    checkCollision();
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Keyboard controls
+
+document.addEventListener("keydown", (e) => {
+
+    if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
+        leftPressed = true;
+    }
+
+    if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
+        rightPressed = true;
+    }
+});
+
+document.addEventListener("keyup", (e) => {
+
+    if (e.key === "ArrowLeft" || e.key.toLowerCase() === "a") {
+        leftPressed = false;
+    }
+
+    if (e.key === "ArrowRight" || e.key.toLowerCase() === "d") {
+        rightPressed = false;
+    }
+});
+
+// Mobile controls
+
+function pressLeft(e) {
+    e.preventDefault();
+    leftPressed = true;
+}
+
+function releaseLeft(e) {
+    e.preventDefault();
+    leftPressed = false;
+}
+
+function pressRight(e) {
+    e.preventDefault();
+    rightPressed = true;
+}
+
+function releaseRight(e) {
+    e.preventDefault();
+    rightPressed = false;
+}
+
+const leftButton = document.getElementById("left");
+const rightButton = document.getElementById("right");
+
+leftButton.addEventListener("touchstart", pressLeft);
+leftButton.addEventListener("touchend", releaseLeft);
+
+rightButton.addEventListener("touchstart", pressRight);
+rightButton.addEventListener("touchend", releaseRight);
+
+leftButton.addEventListener("mousedown", pressLeft);
+leftButton.addEventListener("mouseup", releaseLeft);
+
+rightButton.addEventListener("mousedown", pressRight);
+rightButton.addEventListener("mouseup", releaseRight);
+
+// Restart
+
+restartButton.addEventListener("click", startGame);
+
+// Start
+
+window.addEventListener("resize", resizeCanvas);
+
+startGame();
+
+</script>
+
+</body>
+</html>
